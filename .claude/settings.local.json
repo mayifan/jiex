@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(node check-template.js:*)",
+      "Bash(node check-template.cjs:*)",
+      "Bash(docker build:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run build:*)",
+      "Bash(cat:*)",
+      "Bash(docker save:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}
