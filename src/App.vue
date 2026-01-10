@@ -59,8 +59,8 @@
             <span class="stat-label">项目数</span>
           </div>
           <div class="stat-card">
-            <span class="stat-value">{{ totalPerProject }}</span>
-            <span class="stat-label">每项目 (元)</span>
+            <span class="stat-value">{{ totalProjectAmount }}</span>
+            <span class="stat-label">总金额 (元)</span>
           </div>
           <div class="stat-card" :class="{ 'stat-success': allocatedParticipantCount >= 2 }">
             <span class="stat-value">{{ allocatedParticipantCount }}</span>
@@ -106,33 +106,20 @@
           <div class="section-body">
             <!-- 第一参与者选择 -->
             <div class="first-participant">
-              <label class="field-label">第1参与者</label>
-              <div class="first-participant-row">
-                <el-select
-                  v-model="selectedFirstParticipant"
-                  placeholder="选择第1参与者"
-                  :disabled="fileList.length === 0"
-                  @change="initAllocationForm"
-                >
-                  <el-option
-                    v-for="p in participants"
-                    :key="p.code"
-                    :label="`${p.name} (${p.code})`"
-                    :value="p.code"
-                  />
-                </el-select>
-                <div class="first-amount-input">
-                  <el-input-number
-                    v-model="firstParticipantAmount"
-                    :min="0"
-                    :step="50"
-                    :precision="0"
-                    :disabled="fileList.length === 0"
-                    controls-position="right"
-                  />
-                  <span class="amount-unit">元/项目</span>
-                </div>
-              </div>
+              <label class="field-label">第1参与者（金额从Excel C17读取）</label>
+              <el-select
+                v-model="selectedFirstParticipant"
+                placeholder="选择第1参与者"
+                :disabled="fileList.length === 0"
+                @change="initAllocationForm"
+              >
+                <el-option
+                  v-for="p in participants"
+                  :key="p.code"
+                  :label="`${p.name} (${p.code})`"
+                  :value="p.code"
+                />
+              </el-select>
             </div>
 
             <!-- 添加新参与者 -->
@@ -178,16 +165,16 @@
           <div class="section-header">
             <h3 class="section-title">
               <span class="section-icon">💰</span>
-              金额分配
+              次要参与者分配
             </h3>
             <span class="section-hint" v-if="fileList.length > 0">
-              已分配 {{ allocatedAmount }} 元给其他参与者
+              每个项目需要至少2个不同的次要参与者
             </span>
           </div>
           <div class="section-body">
             <el-alert
-              v-if="willHaveDuplicates && allocatedParticipantCount > 0"
-              title="需要至少2个不同的参与者"
+              v-if="willHaveDuplicates"
+              title="需要至少2个不同的次要参与者分配到项目"
               type="warning"
               :closable="false"
               show-icon
@@ -205,15 +192,16 @@
                   <el-input-number
                     v-model="allocationForm[participant.code]"
                     :min="0"
+                    :max="fileList.length * 2"
                     :step="1"
                     :precision="0"
                     :disabled="fileList.length === 0"
                     @change="calculateTotal"
                     controls-position="right"
                   />
-                  <span class="allocation-unit">百元</span>
+                  <span class="allocation-unit">次</span>
                 </div>
-                <span class="allocation-amount">= {{ (allocationForm[participant.code] || 0) * 100 }} 元</span>
+                <span class="allocation-amount">参与 {{ allocationForm[participant.code] || 0 }} 个项目</span>
               </div>
             </div>
           </div>
@@ -244,7 +232,7 @@
 
     <!-- 底部 -->
     <footer class="app-footer">
-      <p>每个项目金额 = 第1参与者金额 + 其他参与者金额（按分配比例）</p>
+      <p>每个项目金额从Excel C17读取，每个项目至少有2个不同的次要参与者</p>
     </footer>
   </div>
 </template>
@@ -263,6 +251,9 @@ const isGenerating = ref(false)
 // 文件列表
 const fileList = ref([])
 
+// 项目金额（从Excel C17读取）
+const projectAmounts = ref({})
+
 // text4 默认内容
 const text4Content = ref('目前iOS版本和 Android均已上线并完成测试验收。')
 
@@ -278,9 +269,6 @@ const participants = ref([
 
 // 选中的第一参与者
 const selectedFirstParticipant = ref('SFD17221')
-
-// 第一参与者金额（每个项目）
-const firstParticipantAmount = ref(650)
 
 // 其他参与者
 const otherParticipants = computed(() => {
@@ -333,16 +321,9 @@ const removeParticipant = (code) => {
   ElMessage.success('已删除')
 }
 
-// 统计
-const allocatedAmount = ref(0)
-
-// 每个项目的总金额
-const totalPerProject = computed(() => {
-  // 计算其他参与者每个项目平均分配的金额
-  const otherAmountPerProject = allocatedParticipantCount.value > 0
-    ? Math.round(allocatedAmount.value / fileList.value.length)
-    : 0
-  return firstParticipantAmount.value + otherAmountPerProject
+// 总项目金额（从所有Excel C17汇总）
+const totalProjectAmount = computed(() => {
+  return Object.values(projectAmounts.value).reduce((sum, val) => sum + (val || 0), 0)
 })
 
 // 检查分配的参与者数量
@@ -350,37 +331,64 @@ const allocatedParticipantCount = computed(() => {
   return Object.values(allocationForm.value).filter(v => v > 0).length
 })
 
-// 检查是否会导致人员重复
+// 总分配次数
+const totalAllocationCount = computed(() => {
+  return Object.values(allocationForm.value).reduce((sum, val) => sum + (val || 0), 0)
+})
+
+// 检查是否会导致人员重复（每个项目需要2个次要参与者）
 const willHaveDuplicates = computed(() => {
+  // 需要至少2个不同的次要参与者
   return allocatedParticipantCount.value < 2
 })
 
 // 分配是否有效
 const isAllocationValid = computed(() => {
+  // 需要：有文件、至少2个不同参与者、总分配次数等于项目数*2
   return fileList.value.length > 0 &&
-         allocatedAmount.value > 0 &&
-         !willHaveDuplicates.value
+         !willHaveDuplicates.value &&
+         totalAllocationCount.value === fileList.value.length * 2
 })
 
-// 计算已分配总额
+// 计算已分配总数
 const calculateTotal = () => {
-  allocatedAmount.value = Object.values(allocationForm.value).reduce((sum, val) => sum + (val || 0), 0) * 100
+  // 不再需要计算金额，只需要触发响应式更新
 }
 
 // 处理文件上传
-const handleFileChange = (uploadFile) => {
+const handleFileChange = async (uploadFile) => {
   if (!uploadFile.raw.name.match(/\.(xlsx|xls)$/i)) {
     ElMessage.error('请上传Excel文件')
     return false
   }
-  fileList.value.push(uploadFile)
-  initAllocationForm()
+
+  try {
+    // 读取Excel文件获取C17金额
+    const arrayBuffer = await uploadFile.raw.arrayBuffer()
+    const workbook = XLSX.read(arrayBuffer)
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+    const amountValue = worksheet['C17']?.v || 0
+    const amount = typeof amountValue === 'number' ? amountValue : parseFloat(amountValue) || 0
+
+    // 存储文件和金额
+    fileList.value.push(uploadFile)
+    projectAmounts.value[uploadFile.uid] = amount
+
+    initAllocationForm()
+    ElMessage.success(`已读取项目金额: ${amount} 元`)
+  } catch (error) {
+    console.error('读取Excel失败:', error)
+    ElMessage.error('读取Excel文件失败')
+    return false
+  }
+
   return true
 }
 
 // 处理文件移除
 const handleFileRemove = (file) => {
   fileList.value = fileList.value.filter(f => f.uid !== file.uid)
+  delete projectAmounts.value[file.uid]
   if (fileList.value.length === 0) {
     resetAll()
   }
@@ -389,16 +397,16 @@ const handleFileRemove = (file) => {
 // 重置所有
 const resetAll = () => {
   fileList.value = []
+  projectAmounts.value = {}
   Object.keys(allocationForm.value).forEach(key => {
     allocationForm.value[key] = 0
   })
-  allocatedAmount.value = 0
 }
 
 // 确认分配并生成文档
 const confirmAllocation = async () => {
   if (!isAllocationValid.value) {
-    ElMessage.error('请确保金额分配正确')
+    ElMessage.error('请确保分配正确：需要至少2个不同的次要参与者，且总分配次数等于项目数×2')
     return
   }
 
@@ -406,7 +414,7 @@ const confirmAllocation = async () => {
 
   try {
     const allocatedOthers = otherParticipants.value.filter(p => allocationForm.value[p.code] > 0)
-    const projectAllocations = distributeParticipants(fileList.value.length, allocatedOthers)
+    const projectAllocations = distributeParticipants(fileList.value, allocatedOthers)
     const zip = new JSZip()
     const generatedFiles = []
 
@@ -480,70 +488,48 @@ const confirmAllocation = async () => {
   }
 }
 
-// 分配参与者到各个项目
-const distributeParticipants = (projectCount, allocatedOthers) => {
+// 分配参与者到各个项目（确保每个项目至少有2个不同的次要参与者）
+const distributeParticipants = (files, allocatedOthers) => {
   const result = []
   const firstParticipant = participants.value.find(p => p.code === selectedFirstParticipant.value)
 
-  // 计算每个参与者的总金额（百元单位转换为元）
-  const participantAmounts = {}
+  // 追踪每个参与者剩余可分配次数
+  const remainingCounts = {}
   allocatedOthers.forEach(p => {
-    participantAmounts[p.code] = (allocationForm.value[p.code] || 0) * 100
+    remainingCounts[p.code] = allocationForm.value[p.code] || 0
   })
 
-  // 计算总分配金额
-  const totalOtherAmount = Object.values(participantAmounts).reduce((sum, val) => sum + val, 0)
-
-  // 每个项目分配给其他参与者的金额
-  const amountPerProject = Math.round(totalOtherAmount / projectCount)
-
-  // 追踪每个参与者剩余可分配的金额
-  const remainingAmounts = { ...participantAmounts }
-
-  for (let i = 0; i < projectCount; i++) {
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+    const projectAmount = projectAmounts.value[file.uid] || 0
     const projectParticipants = []
 
-    // 获取还有剩余金额的参与者
-    const availableParticipants = allocatedOthers.filter(p => remainingAmounts[p.code] > 0)
+    // 获取还有剩余次数的参与者
+    const availableParticipants = allocatedOthers.filter(p => remainingCounts[p.code] > 0)
 
     if (availableParticipants.length >= 2) {
-      // 随机选择两个参与者
+      // 随机选择两个不同的参与者
       const shuffled = [...availableParticipants].sort(() => Math.random() - 0.5)
       const participant2 = shuffled[0]
       const participant3 = shuffled[1]
 
-      // 计算每人分配的金额（平分这个项目的其他参与者金额）
-      const eachAmount = Math.round(amountPerProject / 2)
+      // 扣除次数
+      remainingCounts[participant2.code]--
+      remainingCounts[participant3.code]--
 
-      // 扣除金额
-      remainingAmounts[participant2.code] -= eachAmount
-      remainingAmounts[participant3.code] -= eachAmount
-
-      projectParticipants.push(
-        { ...firstParticipant, amount: firstParticipantAmount.value },
-        { ...participant2, amount: eachAmount },
-        { ...participant3, amount: eachAmount }
-      )
-    } else if (availableParticipants.length === 1) {
-      const participant2 = availableParticipants[0]
-      const eachAmount = Math.round(amountPerProject / 2)
-      remainingAmounts[participant2.code] -= amountPerProject
+      // 计算金额分配（第一参与者拿大头，其他两人平分剩余）
+      const firstAmount = Math.round(projectAmount * 0.75)  // 75%给第一参与者
+      const remainingAmount = projectAmount - firstAmount
+      const eachAmount = Math.round(remainingAmount / 2)
 
       projectParticipants.push(
-        { ...firstParticipant, amount: firstParticipantAmount.value },
+        { ...firstParticipant, amount: firstAmount },
         { ...participant2, amount: eachAmount },
-        { ...participant2, amount: eachAmount }
+        { ...participant3, amount: projectAmount - firstAmount - eachAmount }  // 确保总额正确
       )
     } else {
-      // 如果没有剩余金额的参与者，使用第一个
-      const fallback = allocatedOthers[0]
-      const eachAmount = Math.round(amountPerProject / 2)
-
-      projectParticipants.push(
-        { ...firstParticipant, amount: firstParticipantAmount.value },
-        { ...fallback, amount: eachAmount },
-        { ...fallback, amount: eachAmount }
-      )
+      // 不应该到这里，因为验证已经确保有足够的参与者
+      throw new Error('没有足够的参与者分配到项目')
     }
     result.push(projectParticipants)
   }
