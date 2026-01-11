@@ -611,6 +611,10 @@ const distributeParticipants = (files, allocatedOthers) => {
   const result = []
   const firstParticipant = participants.value.find(p => p.code === selectedFirstParticipant.value)
 
+  // 调试：打印amountForm的值
+  console.log('amountForm.value:', JSON.stringify(amountForm.value))
+  console.log('allocatedOthers:', allocatedOthers.map(p => p.code))
+
   // 追踪每个参与者剩余可分配次数
   const remainingCounts = {}
   allocatedOthers.forEach(p => {
@@ -641,6 +645,9 @@ const distributeParticipants = (files, allocatedOthers) => {
       const amount2 = amountForm.value[participant2.code] || 0
       const amount3 = amountForm.value[participant3.code] || 0
       const primaryAmount = projectAmount - amount2 - amount3
+
+      // 调试：打印分配详情
+      console.log(`项目 ${i + 1}: 总额=${projectAmount}, ${participant2.name}=${amount2}, ${participant3.name}=${amount3}, 主要=${primaryAmount}`)
 
       projectParticipants.push(
         { ...firstParticipant, amount: primaryAmount },
