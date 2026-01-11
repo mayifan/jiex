@@ -181,6 +181,15 @@
               style="margin-bottom: 16px;"
             />
 
+            <el-alert
+              v-if="hasAmountExceedError"
+              title="次要参与者金额总和超过了某些项目的总金额"
+              type="error"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 16px;"
+            />
+
             <div class="allocation-grid">
               <div
                 class="allocation-item"
@@ -201,7 +210,31 @@
                   />
                   <span class="allocation-unit">次</span>
                 </div>
-                <span class="allocation-amount">参与 {{ allocationForm[participant.code] || 0 }} 个项目</span>
+                <div class="allocation-amount-input">
+                  <el-input-number
+                    v-model="amountForm[participant.code]"
+                    :min="0"
+                    :step="50"
+                    :precision="0"
+                    :disabled="fileList.length === 0 || !allocationForm[participant.code]"
+                    controls-position="right"
+                    placeholder="金额"
+                  />
+                  <span class="allocation-unit">元/次</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 分配预览 -->
+            <div class="allocation-preview" v-if="fileList.length > 0 && allocatedParticipantCount >= 2">
+              <div class="preview-header">分配预览</div>
+              <div class="preview-item" v-for="(file, index) in fileList" :key="file.uid">
+                <span class="preview-name">项目 {{ index + 1 }}</span>
+                <span class="preview-total">总额: {{ projectAmounts[file.uid] || 0 }}元</span>
+                <span class="preview-secondary">次要: {{ getSecondaryTotalForProject(index) }}元</span>
+                <span class="preview-primary" :class="{ 'preview-warning': getPrimaryAmountForProject(index) < 0 }">
+                  主要: {{ getPrimaryAmountForProject(index) }}元
+                </span>
               </div>
             </div>
           </div>
@@ -232,7 +265,7 @@
 
     <!-- 底部 -->
     <footer class="app-footer">
-      <p>每个项目金额从Excel C17读取，每个项目至少有2个不同的次要参与者</p>
+      <p>每个项目金额从Excel C17读取，每个项目至少有2个不同的次要参与者，主要参与者金额=项目总额-次要参与者金额之和</p>
     </footer>
   </div>
 </template>
@@ -275,16 +308,22 @@ const otherParticipants = computed(() => {
   return participants.value.filter(p => p.code !== selectedFirstParticipant.value)
 })
 
-// 金额分配表单
+// 金额分配表单（次数）
 const allocationForm = ref({})
+
+// 金额表单（每次分配的金额）
+const amountForm = ref({})
 
 // 初始化分配表单
 const initAllocationForm = () => {
   const form = {}
+  const amounts = {}
   otherParticipants.value.forEach(p => {
     form[p.code] = allocationForm.value[p.code] || 0
+    amounts[p.code] = amountForm.value[p.code] || 100  // 默认每次100元
   })
   allocationForm.value = form
+  amountForm.value = amounts
 }
 
 // 新增参与者表单
@@ -342,12 +381,91 @@ const willHaveDuplicates = computed(() => {
   return allocatedParticipantCount.value < 2
 })
 
+// 预计算每个项目的分配（用于预览和验证）
+const projectAllocationPreview = computed(() => {
+  if (fileList.value.length === 0 || allocatedParticipantCount.value < 2) {
+    return []
+  }
+
+  const allocatedOthers = otherParticipants.value.filter(p => allocationForm.value[p.code] > 0)
+  const result = []
+
+  // 追踪每个参与者剩余可分配次数
+  const remainingCounts = {}
+  allocatedOthers.forEach(p => {
+    remainingCounts[p.code] = allocationForm.value[p.code] || 0
+  })
+
+  for (let i = 0; i < fileList.value.length; i++) {
+    const file = fileList.value[i]
+    const projectAmount = projectAmounts.value[file.uid] || 0
+
+    // 获取还有剩余次数的参与者
+    const availableParticipants = allocatedOthers.filter(p => remainingCounts[p.code] > 0)
+
+    if (availableParticipants.length >= 2) {
+      // 按剩余次数排序，优先选择剩余次数多的
+      const sorted = [...availableParticipants].sort((a, b) =>
+        remainingCounts[b.code] - remainingCounts[a.code]
+      )
+      const participant2 = sorted[0]
+      const participant3 = sorted[1]
+
+      // 扣除次数
+      remainingCounts[participant2.code]--
+      remainingCounts[participant3.code]--
+
+      // 计算次要参与者金额
+      const amount2 = amountForm.value[participant2.code] || 0
+      const amount3 = amountForm.value[participant3.code] || 0
+      const secondaryTotal = amount2 + amount3
+      const primaryAmount = projectAmount - secondaryTotal
+
+      result.push({
+        projectAmount,
+        participant2: { ...participant2, amount: amount2 },
+        participant3: { ...participant3, amount: amount3 },
+        secondaryTotal,
+        primaryAmount
+      })
+    } else {
+      result.push({
+        projectAmount,
+        participant2: null,
+        participant3: null,
+        secondaryTotal: 0,
+        primaryAmount: projectAmount
+      })
+    }
+  }
+
+  return result
+})
+
+// 获取某个项目的次要参与者总金额
+const getSecondaryTotalForProject = (index) => {
+  const preview = projectAllocationPreview.value[index]
+  return preview ? preview.secondaryTotal : 0
+}
+
+// 获取某个项目的主要参与者金额
+const getPrimaryAmountForProject = (index) => {
+  const preview = projectAllocationPreview.value[index]
+  return preview ? preview.primaryAmount : 0
+}
+
+// 检查是否有金额超出错误
+const hasAmountExceedError = computed(() => {
+  return projectAllocationPreview.value.some(p => p.primaryAmount < 0)
+})
+
 // 分配是否有效
 const isAllocationValid = computed(() => {
-  // 需要：有文件、至少2个不同参与者、总分配次数等于项目数*2
+  // 需要：有文件、至少2个不同参与者、总分配次数等于项目数*2、金额不超过项目总额
   return fileList.value.length > 0 &&
          !willHaveDuplicates.value &&
-         totalAllocationCount.value === fileList.value.length * 2
+         totalAllocationCount.value === fileList.value.length * 2 &&
+         !hasAmountExceedError.value
 })
 
 // 计算已分配总数
@@ -508,24 +626,26 @@ const distributeParticipants = (files, allocatedOthers) => {
     const availableParticipants = allocatedOthers.filter(p => remainingCounts[p.code] > 0)
 
     if (availableParticipants.length >= 2) {
-      // 随机选择两个不同的参与者
-      const shuffled = [...availableParticipants].sort(() => Math.random() - 0.5)
-      const participant2 = shuffled[0]
-      const participant3 = shuffled[1]
+      // 按剩余次数排序，优先选择剩余次数多的（与预览保持一致）
+      const sorted = [...availableParticipants].sort((a, b) =>
+        remainingCounts[b.code] - remainingCounts[a.code]
+      )
+      const participant2 = sorted[0]
+      const participant3 = sorted[1]
 
       // 扣除次数
       remainingCounts[participant2.code]--
       remainingCounts[participant3.code]--
 
-      // 计算金额分配（第一参与者拿大头，其他两人平分剩余）
-      const firstAmount = Math.round(projectAmount * 0.75)  // 75%给第一参与者
-      const remainingAmount = projectAmount - firstAmount
-      const eachAmount = Math.round(remainingAmount / 2)
+      // 使用用户设置的金额
+      const amount2 = amountForm.value[participant2.code] || 0
+      const amount3 = amountForm.value[participant3.code] || 0
+      const primaryAmount = projectAmount - amount2 - amount3
 
       projectParticipants.push(
-        { ...firstParticipant, amount: firstAmount },
-        { ...participant2, amount: eachAmount },
-        { ...participant3, amount: projectAmount - firstAmount - eachAmount }  // 确保总额正确
+        { ...firstParticipant, amount: primaryAmount },
+        { ...participant2, amount: amount2 },
+        { ...participant3, amount: amount3 }
       )
     } else {
       // 不应该到这里，因为验证已经确保有足够的参与者
@@ -942,9 +1062,9 @@ body {
 
 .allocation-item {
   display: grid;
-  grid-template-columns: 100px 1fr auto;
+  grid-template-columns: 80px 1fr 1fr;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .allocation-label {
@@ -972,6 +1092,69 @@ body {
   color: var(--color-accent);
   min-width: 80px;
   text-align: right;
+}
+
+.allocation-amount-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.allocation-amount-input :deep(.el-input-number) {
+  width: 120px;
+}
+
+/* 分配预览 */
+.allocation-preview {
+  margin-top: 20px;
+  padding: 16px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.preview-header {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.preview-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.875rem;
+}
+
+.preview-item:last-child {
+  border-bottom: none;
+}
+
+.preview-name {
+  font-weight: 500;
+  min-width: 60px;
+}
+
+.preview-total {
+  color: var(--color-text-muted);
+}
+
+.preview-secondary {
+  color: var(--color-accent);
+}
+
+.preview-primary {
+  color: var(--color-success);
+  margin-left: auto;
+}
+
+.preview-warning {
+  color: var(--color-error) !important;
 }
 
 /* 操作栏 */
