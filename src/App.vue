@@ -531,8 +531,20 @@ const confirmAllocation = async () => {
   isGenerating.value = true
 
   try {
-    const allocatedOthers = otherParticipants.value.filter(p => allocationForm.value[p.code] > 0)
-    const projectAllocations = distributeParticipants(fileList.value, allocatedOthers)
+    // 直接使用预览数据，确保与界面显示一致
+    const firstParticipant = participants.value.find(p => p.code === selectedFirstParticipant.value)
+    const previewData = projectAllocationPreview.value
+
+    // 调试：打印预览数据
+    console.log('previewData:', JSON.stringify(previewData))
+
+    const projectAllocations = previewData.map(preview => {
+      return [
+        { ...firstParticipant, amount: preview.primaryAmount },
+        preview.participant2,
+        preview.participant3
+      ]
+    })
     const zip = new JSZip()
     const generatedFiles = []
 
@@ -606,62 +618,6 @@ const confirmAllocation = async () => {
   }
 }
 
-// 分配参与者到各个项目（确保每个项目至少有2个不同的次要参与者）
-const distributeParticipants = (files, allocatedOthers) => {
-  const result = []
-  const firstParticipant = participants.value.find(p => p.code === selectedFirstParticipant.value)
-
-  // 调试：打印amountForm的值
-  console.log('amountForm.value:', JSON.stringify(amountForm.value))
-  console.log('allocatedOthers:', allocatedOthers.map(p => p.code))
-
-  // 追踪每个参与者剩余可分配次数
-  const remainingCounts = {}
-  allocatedOthers.forEach(p => {
-    remainingCounts[p.code] = allocationForm.value[p.code] || 0
-  })
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i]
-    const projectAmount = projectAmounts.value[file.uid] || 0
-    const projectParticipants = []
-
-    // 获取还有剩余次数的参与者
-    const availableParticipants = allocatedOthers.filter(p => remainingCounts[p.code] > 0)
-
-    if (availableParticipants.length >= 2) {
-      // 按剩余次数排序，优先选择剩余次数多的（与预览保持一致）
-      const sorted = [...availableParticipants].sort((a, b) =>
-        remainingCounts[b.code] - remainingCounts[a.code]
-      )
-      const participant2 = sorted[0]
-      const participant3 = sorted[1]
-
-      // 扣除次数
-      remainingCounts[participant2.code]--
-      remainingCounts[participant3.code]--
-
-      // 使用用户设置的金额
-      const amount2 = amountForm.value[participant2.code] || 0
-      const amount3 = amountForm.value[participant3.code] || 0
-      const primaryAmount = projectAmount - amount2 - amount3
-
-      // 调试：打印分配详情
-      console.log(`项目 ${i + 1}: 总额=${projectAmount}, ${participant2.name}=${amount2}, ${participant3.name}=${amount3}, 主要=${primaryAmount}`)
-
-      projectParticipants.push(
-        { ...firstParticipant, amount: primaryAmount },
-        { ...participant2, amount: amount2 },
-        { ...participant3, amount: amount3 }
-      )
-    } else {
-      // 不应该到这里，因为验证已经确保有足够的参与者
-      throw new Error('没有足够的参与者分配到项目')
-    }
-    result.push(projectParticipants)
-  }
-  return result
-}
 </script>
 
 <style>
