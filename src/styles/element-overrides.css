@@ -1,0 +1,99 @@
+/* Element Plus 覆盖样式 */
+
+:deep(.el-input__wrapper),
+:deep(.el-textarea__inner),
+:deep(.el-select__wrapper) {
+  background: white;
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease-out;
+}
+
+:deep(.el-input__wrapper:hover),
+:deep(.el-textarea__inner:hover),
+:deep(.el-select__wrapper:hover) {
+  border-color: var(--color-border-hover);
+}
+
+:deep(.el-input__wrapper.is-focus),
+:deep(.el-textarea__inner:focus),
+:deep(.el-select__wrapper.is-focused) {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+:deep(.el-input__inner),
+:deep(.el-textarea__inner) {
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+:deep(.el-input__inner::placeholder),
+:deep(.el-textarea__inner::placeholder) {
+  color: var(--color-text-muted);
+}
+
+:deep(.el-button) {
+  border-radius: var(--radius-md);
+  font-family: var(--font-heading);
+  font-weight: 600;
+  transition: all 0.2s ease-out;
+}
+
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  border: none;
+  color: white;
+}
+
+:deep(.el-button--primary:hover) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+:deep(.el-button--primary:active) {
+  transform: translateY(0);
+}
+
+:deep(.el-input-number) {
+  width: 140px;
+}
+
+:deep(.el-input-number .el-input__inner) {
+  text-align: left;
+}
+
+:deep(.el-checkbox__label) {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+:deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+:deep(.el-select-dropdown) {
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-lg);
+}
+
+:deep(.el-upload-list) {
+  margin-top: var(--spacing-md);
+}
+
+:deep(.el-upload-list__item) {
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  transition: all 0.2s ease-out;
+}
+
+:deep(.el-upload-list__item:hover) {
+  background: var(--color-bg);
+  border-color: var(--color-border-hover);
+}

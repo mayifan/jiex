@@ -1,0 +1,5 @@
+export { default as AppNav } from './layout/AppNav.vue'
+export { default as FileUpload } from './upload/FileUpload.vue'
+export { default as ParticipantManager } from './participant/ParticipantManager.vue'
+export { default as ProjectAllocation } from './project/ProjectAllocation.vue'
+export { default as DocumentPreview } from './preview/DocumentPreview.vue'

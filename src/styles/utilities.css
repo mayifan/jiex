@@ -1,0 +1,51 @@
+/* 工具类 */
+
+/* 文本颜色 */
+.text-success {
+  color: var(--color-success) !important;
+}
+
+.text-warning {
+  color: var(--color-warning) !important;
+}
+
+.text-error {
+  color: var(--color-error) !important;
+}
+
+/* 宽度 */
+.w-full {
+  width: 100%;
+}
+
+/* Flex 布局 */
+.flex-center {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 卡片基础样式 */
+.card-base {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-xl);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease-out;
+}
+
+.card-base:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.card-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
