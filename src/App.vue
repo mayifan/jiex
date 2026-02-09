@@ -35,6 +35,33 @@
             :disabled="isDisabled"
             class="content-textarea"
           />
+
+          <div class="job-grid">
+            <el-input
+              v-model="jobContents.job1"
+              type="textarea"
+              :rows="2"
+              placeholder="个人负责实现 1（对应模板 {job1}）"
+              :disabled="isDisabled"
+              class="job-input"
+            />
+            <el-input
+              v-model="jobContents.job2"
+              type="textarea"
+              :rows="2"
+              placeholder="个人负责实现 2（对应模板 {job2}）"
+              :disabled="isDisabled"
+              class="job-input"
+            />
+            <el-input
+              v-model="jobContents.job3"
+              type="textarea"
+              :rows="2"
+              placeholder="个人负责实现 3（对应模板 {job3}）"
+              :disabled="isDisabled"
+              class="job-input"
+            />
+          </div>
         </div>
 
         <div class="config-section">
@@ -126,6 +153,11 @@ import { IconEdit, IconReset, IconPen, IconMoney } from './components/icons'
 import { useParticipants, useProjectAllocation, useFileUpload, useDocumentGeneration } from './composables'
 
 const text4Content = ref('目前iOS版本和 Android均已上线并完成测试验收。')
+const jobContents = ref({
+  job1: '开发',
+  job2: '协助开发',
+  job3: '协助开发'
+})
 
 const {
   participants,
@@ -192,6 +224,7 @@ const confirmAllocation = async () => {
     participants: participants.value,
     selectedFirstParticipant: selectedFirstParticipant.value,
     text4Content: text4Content.value,
+    jobContents: jobContents.value,
     getPrimaryAmount,
     onSuccess: resetAll
   })
@@ -358,6 +391,18 @@ const confirmAllocation = async () => {
 .content-textarea :deep(.el-textarea__inner) {
   font-family: var(--font-body);
   font-size: 0.875rem;
+}
+
+.job-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.job-input :deep(.el-textarea__inner) {
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
 }
 
 .action-buttons {
