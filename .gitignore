@@ -8,7 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-# dist  # 注释掉以便 GitHub Pages 使用
+dist
 dist-ssr
 *.local
 
@@ -27,3 +27,7 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Temporary Office files
+.~*.docx
+~$*.docx
