@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { existsSync } from 'node:fs'
 import { requestDeepSeekContent } from './deepseekService.mjs'
+import { requestGlmOcrText } from './glmOcrService.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -15,7 +16,7 @@ dotenv.config({ path: path.join(rootDir, '.env') })
 const app = express()
 const port = Number(process.env.PORT || 8080)
 
-app.use(express.json({ limit: '1mb' }))
+app.use(express.json({ limit: '20mb' }))
 
 app.post('/api/deepseek/content', async (req, res) => {
   const projectName = req.body?.projectName
@@ -30,6 +31,22 @@ app.post('/api/deepseek/content', async (req, res) => {
   } catch (error) {
     console.error('DeepSeek content generation failed:', error)
     res.status(500).json({ error: error.message || 'DeepSeek调用失败' })
+  }
+})
+
+app.post('/api/glm/ocr', async (req, res) => {
+  const file = req.body?.file || req.body?.imageUrl || req.body?.imageBase64
+  if (!file) {
+    res.status(400).json({ error: '缺少 file 参数' })
+    return
+  }
+
+  try {
+    const text = await requestGlmOcrText({ file })
+    res.json({ text })
+  } catch (error) {
+    console.error('GLM-OCR failed:', error)
+    res.status(500).json({ error: error.message || 'GLM-OCR 调用失败' })
   }
 })
 

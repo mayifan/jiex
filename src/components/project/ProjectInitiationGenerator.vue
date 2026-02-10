@@ -61,7 +61,7 @@
           <p class="zone-text">可拖拽图片截图或文本到这里，也可先点击后 Ctrl/Cmd + V 粘贴截图/文本。</p>
         </div>
 
-        <p class="batch-hint">截图识别支持中英混合。首次识别会下载语言包，耗时会稍长。</p>
+        <p class="batch-hint">截图识别由 GLM-OCR 服务完成，速度与效果取决于服务端配置。</p>
 
         <el-table :data="projectRows" size="small" border empty-text="暂无立项数据，请先输入或截图识别" class="rows-table">
           <el-table-column label="Number" min-width="170">
@@ -248,6 +248,7 @@ import { ElMessage } from 'element-plus'
 import JSZip from 'jszip'
 import ParticipantManager from '../participant/ParticipantManager.vue'
 import { requestInitiationContent } from '../../services/deepseekContent'
+import { requestGlmOcrText } from '../../services/glmOcr'
 
 const props = defineProps({
   participants: { type: Array, required: true },
@@ -1012,50 +1013,38 @@ const preprocessImageForOcr = (imageFile) => new Promise((resolve, reject) => {
   image.src = imageUrl
 })
 
+const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader()
+  reader.onload = () => {
+    if (typeof reader.result === 'string') {
+      resolve(reader.result)
+    } else {
+      reject(new Error('图片读取失败'))
+    }
+  }
+  reader.onerror = () => reject(new Error('图片读取失败'))
+  reader.readAsDataURL(file)
+})
+
+const canvasToDataUrl = (canvas) => canvas.toDataURL('image/jpeg', 0.92)
+
+const buildOcrFilePayload = async (imageFile) => {
+  try {
+    const processedCanvas = await preprocessImageForOcr(imageFile)
+    return canvasToDataUrl(processedCanvas)
+  } catch (error) {
+    console.warn('OCR 图像预处理失败，回退原图识别：', error)
+    return readFileAsDataUrl(imageFile)
+  }
+}
+
 const recognizeRowsFromImageFile = async (imageFile) => {
   if (!imageFile || !imageFile.type?.startsWith('image/')) return []
 
-  const { createWorker } = await import('tesseract.js')
-  const worker = await createWorker('chi_sim+eng')
-  try {
-    await worker.setParameters({
-      tessedit_pageseg_mode: '6',
-      preserve_interword_spaces: '1'
-    })
-
-    const originalResult = await worker.recognize(imageFile)
-    const originalText = originalResult?.data?.text || ''
-
-    await worker.setParameters({
-      tessedit_pageseg_mode: '11',
-      preserve_interword_spaces: '1'
-    })
-    const sparseResult = await worker.recognize(imageFile)
-    const sparseText = sparseResult?.data?.text || ''
-
-    let enhancedText = ''
-    try {
-      const processedCanvas = await preprocessImageForOcr(imageFile)
-      await worker.setParameters({
-        tessedit_pageseg_mode: '6',
-        preserve_interword_spaces: '1'
-      })
-      const enhancedResult = await worker.recognize(processedCanvas)
-      enhancedText = enhancedResult?.data?.text || ''
-    } catch (error) {
-      console.warn('OCR 图像预处理失败，回退原图识别：', error)
-    }
-
-    const mergedRows = [
-      ...extractRowsFromText(originalText).rows,
-      ...extractRowsFromText(sparseText).rows,
-      ...extractRowsFromText(enhancedText).rows
-    ]
-
-    return mergeRowsByNumber(mergedRows)
-  } finally {
-    await worker.terminate()
-  }
+  const file = await buildOcrFilePayload(imageFile)
+  const ocrText = await requestGlmOcrText({ file })
+  const { rows } = extractRowsFromText(ocrText)
+  return mergeRowsByNumber(rows)
 }
 
 const appendRowsFromImages = async (imageFiles, sourceLabel = '截图') => {

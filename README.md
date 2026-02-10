@@ -52,6 +52,18 @@ DEEPSEEK_API_KEY=your_key npm run start
 
 识别到项目名包含 `国外设备售后及参数调整` 时，系统将直接使用固定 Content，不再调用 DeepSeek。
 
+## GLM-OCR 配置（截图识别）
+
+截图识别改为服务端调用 GLM-OCR（BigModel）。请先配置以下环境变量：
+
+```bash
+GLM_OCR_API_KEY=your_api_key
+GLM_OCR_BASE_URL=https://open.bigmodel.cn
+GLM_OCR_MODEL=glm-ocr
+```
+
+服务启动后，前端截图识别会调用 `/api/glm/ocr`，由服务端转发到 GLM-OCR 服务。
+
 ## 参与者配置
 
 ### 默认参与者列表
