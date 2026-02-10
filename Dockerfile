@@ -1,4 +1,4 @@
-# 构建阶段
+# Build stage
 FROM node:18-alpine AS build-stage
 WORKDIR /app
 COPY package*.json ./
@@ -6,9 +6,16 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# 生产阶段
-FROM nginx:stable-alpine AS production-stage
-COPY --from=build-stage /app/dist /usr/share/nginx/html
-COPY --from=build-stage /app/template.docx /usr/share/nginx/html/template.docx
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# Production stage
+FROM node:18-alpine AS production-stage
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY package*.json ./
+RUN npm install --omit=dev
+
+COPY --from=build-stage /app/dist ./dist
+COPY --from=build-stage /app/server ./server
+
+EXPOSE 8080
+CMD ["npm", "run", "start"]

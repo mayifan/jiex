@@ -7,7 +7,9 @@ services:
       dockerfile: Dockerfile
     container_name: jiex-app
     ports:
-      - "8080:80"
+      - "8080:8080"
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-chat}

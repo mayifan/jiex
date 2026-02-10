@@ -3,14 +3,19 @@
     <AppNav
       :file-count="fileList.length"
       :valid-count="validProjectCount"
+      :active-page="activePage"
     />
 
     <header class="page-header">
-      <h1 class="page-title">Keeson 结项工具</h1>
-      <p class="page-description">上传Excel文件，自动生成格式化的Word结项文档</p>
+      <h1 class="page-title">{{ pageTitle }}</h1>
+      <p class="page-description">{{ pageDescription }}</p>
+      <el-radio-group v-model="activePage" size="large" class="page-switch">
+        <el-radio-button label="completion">结项单生成</el-radio-button>
+        <el-radio-button label="initiation">立项单生成</el-radio-button>
+      </el-radio-group>
     </header>
 
-    <main class="main-content">
+    <main v-if="activePage === 'completion'" class="main-content">
       <FileUpload
         :file-list="fileList"
         :total-amount="totalProjectAmount"
@@ -119,13 +124,31 @@
       </section>
     </main>
 
+    <main v-else class="main-content-single">
+      <ProjectInitiationGenerator
+        :participants="participants"
+        :selected-first-participant="selectedFirstParticipant"
+        :new-participant="newParticipant"
+        @update:selected-first-participant="onFirstParticipantChange"
+        @update:new-participant-name="newParticipant.name = $event"
+        @update:new-participant-code="newParticipant.code = $event"
+        @add-participant="addParticipant(reinitProjects)"
+        @remove-participant="(code) => removeParticipant(code, reinitProjects)"
+      />
+    </main>
+
     <footer class="page-footer">
-      <p class="footer-text">每个项目金额从Excel C17读取（如无值则读取C18），每个项目至少有2个不同的次要参与者</p>
-      <p class="footer-text">主要参与者金额 = 项目总额 - 次要参与者金额之和</p>
+      <template v-if="activePage === 'completion'">
+        <p class="footer-text">每个项目金额从Excel C17读取（如无值则读取C18），每个项目至少有2个不同的次要参与者</p>
+        <p class="footer-text">主要参与者金额 = 项目总额 - 次要参与者金额之和</p>
+      </template>
+      <template v-else>
+        <p class="footer-text">使用 public/立项模板.xlsx 生成立项单，所有 { } 字段均可在页面中编辑</p>
+        <p class="footer-text">项目负责人对应主要参与者（仅 1 人），项目成员对应次要参与者（使用“、”分隔）</p>
+      </template>
     </footer>
 
-    <!-- 固定浮动的金额汇总面板 -->
-    <div class="floating-summary" v-if="fileList.length > 0">
+    <div class="floating-summary" v-if="activePage === 'completion' && fileList.length > 0">
       <div class="summary-header">
         <IconMoney class="summary-icon" />
         <span>金额汇总</span>
@@ -146,18 +169,69 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { AppNav, FileUpload, ParticipantManager, ProjectAllocation } from './components'
+import { AppNav, FileUpload, ParticipantManager, ProjectAllocation, ProjectInitiationGenerator } from './components'
 import { IconEdit, IconReset, IconPen, IconMoney } from './components/icons'
 import { useParticipants, useProjectAllocation, useFileUpload, useDocumentGeneration } from './composables'
 
-const text4Content = ref('目前iOS版本和 Android均已上线并完成测试验收。')
-const jobContents = ref({
-  job1: '开发',
-  job2: '协助开发',
-  job3: '协助开发'
+const COMPLETION_TEMPLATE_STORAGE_KEY = 'keeson-completion-template-v1'
+
+const createDefaultCompletionTemplate = () => ({
+  text4Content: '目前iOS版本和 Android均已上线并完成测试验收。',
+  jobContents: {
+    job1: '开发',
+    job2: '协助开发',
+    job3: '协助开发'
+  }
 })
+
+const loadCompletionTemplate = () => {
+  const defaults = createDefaultCompletionTemplate()
+  try {
+    const raw = localStorage.getItem(COMPLETION_TEMPLATE_STORAGE_KEY)
+    if (!raw) return defaults
+
+    const parsed = JSON.parse(raw)
+    return {
+      text4Content: String(parsed?.text4Content || defaults.text4Content),
+      jobContents: {
+        job1: String(parsed?.jobContents?.job1 || defaults.jobContents.job1),
+        job2: String(parsed?.jobContents?.job2 || defaults.jobContents.job2),
+        job3: String(parsed?.jobContents?.job3 || defaults.jobContents.job3)
+      }
+    }
+  } catch {
+    return defaults
+  }
+}
+
+const persistCompletionTemplate = (text4Value, jobs) => {
+  try {
+    localStorage.setItem(
+      COMPLETION_TEMPLATE_STORAGE_KEY,
+      JSON.stringify({
+        text4Content: text4Value,
+        jobContents: jobs
+      })
+    )
+  } catch {
+    // Ignore localStorage failures and keep UI usable.
+  }
+}
+
+const activePage = ref('completion')
+
+const pageTitle = computed(() => (activePage.value === 'completion' ? 'Keeson 结项工具' : 'Keeson 立项工具'))
+const pageDescription = computed(() => (
+  activePage.value === 'completion'
+    ? '上传Excel文件，自动生成格式化的Word结项文档'
+    : '基于立项模板填写参数并生成 DOC-MP-{Number} 的立项单'
+))
+
+const cachedTemplate = loadCompletionTemplate()
+const text4Content = ref(cachedTemplate.text4Content)
+const jobContents = ref(cachedTemplate.jobContents)
 
 const {
   participants,
@@ -194,6 +268,14 @@ const {
 } = useFileUpload(initProjectAllocation)
 
 const { isGenerating, generateDocuments } = useDocumentGeneration()
+
+watch(
+  [text4Content, jobContents],
+  () => {
+    persistCompletionTemplate(text4Content.value, jobContents.value)
+  },
+  { deep: true }
+)
 
 const isAllProjectsValid = createIsAllProjectsValid(fileList)
 const validProjectCount = createValidProjectCount(fileList)
@@ -261,6 +343,10 @@ const confirmAllocation = async () => {
   color: var(--color-text-muted);
 }
 
+.page-switch {
+  margin-top: var(--spacing-lg);
+}
+
 .main-content {
   max-width: 1280px;
   margin: 0 auto;
@@ -268,6 +354,12 @@ const confirmAllocation = async () => {
   display: grid;
   grid-template-columns: 1fr 1.5fr;
   gap: var(--spacing-xl);
+}
+
+.main-content-single {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-xl);
 }
 
 /* 固定浮动汇总面板 */
@@ -458,6 +550,7 @@ const confirmAllocation = async () => {
 @media (max-width: 768px) {
   .page-header,
   .main-content,
+  .main-content-single,
   .page-footer {
     padding-left: var(--spacing-md);
     padding-right: var(--spacing-md);

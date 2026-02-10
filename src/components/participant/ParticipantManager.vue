@@ -8,7 +8,10 @@
     </div>
 
     <div class="form-group">
-      <label class="form-label">主要参与者 <span class="label-hint">（金额从Excel C17或C18读取）</span></label>
+      <label class="form-label">
+        {{ primaryLabel }}
+        <span v-if="primaryHint" class="label-hint">（{{ primaryHint }}）</span>
+      </label>
       <el-select
         :model-value="selectedFirstParticipant"
         placeholder="选择主要参与者"
@@ -63,7 +66,7 @@
           <span class="chip-name">{{ p.name }}</span>
           <span class="chip-code">{{ p.code }}</span>
         </div>
-        <span class="chip-amount">¥{{ getParticipantTotal(p.code) }}</span>
+        <span v-if="showAmount" class="chip-amount">¥{{ getParticipantTotal(p.code) }}</span>
         <span v-if="p.code === selectedFirstParticipant" class="chip-badge">主要</span>
         <button
           v-else-if="participants.length > 2"
@@ -85,7 +88,10 @@ defineProps({
   selectedFirstParticipant: { type: String, required: true },
   newParticipant: { type: Object, required: true },
   disabled: { type: Boolean, default: false },
-  getParticipantTotal: { type: Function, default: () => 0 }
+  getParticipantTotal: { type: Function, default: () => 0 },
+  primaryLabel: { type: String, default: '主要参与者' },
+  primaryHint: { type: String, default: '金额从Excel C17或C18读取' },
+  showAmount: { type: Boolean, default: true }
 })
 
 defineEmits([

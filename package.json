@@ -7,13 +7,17 @@
     "dev": "vite",
     "build": "vite build",
     "build:github": "GITHUB_PAGES=true vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node server/index.mjs"
   },
   "dependencies": {
     "docxtemplater": "^3.37.12",
+    "dotenv": "^16.4.7",
     "element-plus": "^2.3.9",
+    "express": "^4.21.2",
     "jszip": "^3.10.1",
     "pizzip": "^3.1.4",
+    "tesseract.js": "^5.1.1",
     "vue": "^3.3.4",
     "xlsx": "^0.18.5"
   },

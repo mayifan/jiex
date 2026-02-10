@@ -3,10 +3,10 @@
     <div class="nav-container">
       <div class="nav-brand">
         <IconDocument class="brand-icon" />
-        <span class="brand-text">Keeson 结项工具</span>
+        <span class="brand-text">{{ brandText }}</span>
         <span class="brand-badge">PRO</span>
       </div>
-      <div class="nav-stats" v-if="fileCount > 0">
+      <div class="nav-stats" v-if="activePage === 'completion' && fileCount > 0">
         <div class="nav-stat-item">
           <span class="stat-label">项目数</span>
           <span class="stat-value">{{ fileCount }}</span>
@@ -23,9 +23,10 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { IconDocument } from '../icons'
 
-defineProps({
+const props = defineProps({
   fileCount: {
     type: Number,
     default: 0
@@ -33,8 +34,14 @@ defineProps({
   validCount: {
     type: Number,
     default: 0
+  },
+  activePage: {
+    type: String,
+    default: 'completion'
   }
 })
+
+const brandText = computed(() => (props.activePage === 'initiation' ? 'Keeson 立项工具' : 'Keeson 结项工具'))
 </script>
 
 <style scoped>

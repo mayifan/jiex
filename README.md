@@ -14,6 +14,43 @@
 - 使用模板生成结项单 Word 文档
 - 根据金额分配自动分配项目参与者
 - 批量处理并打包为 ZIP 文件下载
+- **DeepSeek Content 智能生成（立项单）**：按固定格式生成一句总结 + 固定引导句 + 分点内容
+
+## DeepSeek 配置（立项单 Content）
+
+为避免 API Key 泄露，DeepSeek 调用放在服务端 `/api/deepseek/content`，前端不保存密钥。
+
+1. 复制环境变量模板并填写密钥（建议本地使用 `.env.local`，该文件已被 `.gitignore` 忽略）：
+
+```bash
+cp .env.example .env.local
+# 编辑 .env.local，设置 DEEPSEEK_API_KEY
+```
+
+2. 本地开发启动：
+
+```bash
+npm install
+npm run dev
+```
+
+3. 生产部署启动（先构建）：
+
+```bash
+npm run build
+DEEPSEEK_API_KEY=your_key npm run start
+```
+
+立项页新增按钮：
+- `AI批量生成Content`：为当前全部项目批量生成内容
+- `AI生成`：只为单条项目生成内容
+
+输出格式固定为：
+- 第1行：一句话总结
+- 第2行：`{项目名称}主要包含以下内容：`
+- 第3行起：编号分点
+
+识别到项目名包含 `国外设备售后及参数调整` 时，系统将直接使用固定 Content，不再调用 DeepSeek。
 
 ## 参与者配置
 
@@ -65,6 +102,9 @@ npm run build
 ### 使用 Docker Compose（推荐）
 
 ```bash
+# 先在当前 shell 注入密钥（或放在 .env 文件中）
+export DEEPSEEK_API_KEY=your_key
+
 # 构建并启动
 docker-compose up -d
 
@@ -83,8 +123,10 @@ docker-compose logs -f
 # 构建镜像
 docker build -t jiex-app .
 
-# 运行容器
-docker run -d -p 8080:80 --name jiex-app jiex-app
+# 运行容器（通过环境变量注入密钥）
+docker run -d -p 8080:8080 \
+  -e DEEPSEEK_API_KEY=your_key \
+  --name jiex-app jiex-app
 
 # 停止容器
 docker stop jiex-app
