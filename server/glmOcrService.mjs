@@ -60,13 +60,18 @@ const extractOcrText = (payload) => {
   return ''
 }
 
-const normalizeFilePayload = (file = '') => {
-  return String(file || '').trim()
+const parseErrorDetails = async (response) => {
+  try {
+    const errorPayload = await response.json()
+    return errorPayload?.error?.message || errorPayload?.error || errorPayload?.message || response.statusText
+  } catch {
+    return response.statusText
+  }
 }
 
 export const requestGlmOcrText = async ({ file } = {}) => {
   ensureEnvLoaded()
-  const safeFile = normalizeFilePayload(file)
+  const safeFile = String(file || '').trim()
   if (!safeFile) {
     throw new Error('OCR 识别缺少文件数据')
   }
@@ -89,13 +94,7 @@ export const requestGlmOcrText = async ({ file } = {}) => {
   })
 
   if (!response.ok) {
-    let details = response.statusText
-    try {
-      const errorPayload = await response.json()
-      details = errorPayload?.error?.message || errorPayload?.error || errorPayload?.message || details
-    } catch {
-      // ignore parsing error
-    }
+    const details = await parseErrorDetails(response)
     throw new Error(`GLM-OCR 请求失败(${response.status})：${details || '未知错误'}`)
   }
 

@@ -76,9 +76,15 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="自动生成的 Content 预览" min-width="420">
+          <el-table-column label="自动生成的 Content 预览（可手动修改）" min-width="420">
             <template #default="scope">
-              <span class="content-preview">{{ getContentByRow(scope.row) }}</span>
+              <el-input
+                :model-value="getEditableContentByRow(scope.row)"
+                type="textarea"
+                :autosize="{ minRows: 2, maxRows: 8 }"
+                placeholder="支持手动修改最终写入模板的 Content"
+                @update:model-value="updateRowContent(scope.row, $event)"
+              />
             </template>
           </el-table-column>
 
@@ -165,7 +171,7 @@
         </div>
 
         <div class="form-grid five-columns">
-          <el-form-item label="{StartDate}">
+          <el-form-item label="项目申请">
             <el-date-picker
               v-model="form.startDate"
               type="date"
@@ -176,7 +182,7 @@
             />
           </el-form-item>
 
-          <el-form-item label="{Date1}">
+          <el-form-item label="方案论证">
             <el-date-picker
               v-model="form.date1"
               type="date"
@@ -187,7 +193,7 @@
             />
           </el-form-item>
 
-          <el-form-item label="{Date2}">
+          <el-form-item label="方案设计">
             <el-date-picker
               v-model="form.date2"
               type="date"
@@ -198,7 +204,7 @@
             />
           </el-form-item>
 
-          <el-form-item label="{Date3}">
+          <el-form-item label="项目执行">
             <el-date-picker
               v-model="form.date3"
               type="date"
@@ -209,7 +215,7 @@
             />
           </el-form-item>
 
-          <el-form-item label="{EndDate}">
+          <el-form-item label="项目验收">
             <el-date-picker
               v-model="form.endDate"
               type="date"
@@ -267,6 +273,7 @@ const emit = defineEmits([
 const DAY_IN_MS = 24 * 60 * 60 * 1000
 const TEMPLATE_URL = encodeURI('/立项模板.xlsx')
 const TEMPLATE_STORAGE_KEY = 'keeson-initiation-template-settings-v1'
+const DATE_RANDOM_OFFSET_RANGE = 3
 const SPECIAL_PROJECT_KEYWORD = '国外设备售后及参数调整'
 const SPECIAL_PROJECT_CONTENT = `每月处理国外售后反馈的异常问题，如睡眠报告不准、睡眠报告不出、打鼾误干预、打鼾不干预、闹钟触发不抬起、一键入眠无报告、传感器无数据上报等一系列问题，需要对用户的操作、设备的信息、睡眠报告等进行分析，并给出解决方案。
 1.使用售后系统对设备进行参数调整，打鼾干预参数、放大倍率、工作模式、打鼾干预抬起速率；
@@ -284,6 +291,35 @@ const isoToDayNumber = (isoDate) => {
 const dayNumberToIso = (dayNumber) => {
   const date = new Date(dayNumber * DAY_IN_MS)
   return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`
+}
+const getRandomDayOffset = () => Math.floor(Math.random() * (DATE_RANDOM_OFFSET_RANGE * 2 + 1)) - DATE_RANDOM_OFFSET_RANGE
+const buildRandomizedDates = (
+  { startDate, date1, date2, date3, endDate },
+  { includeEndDate = true } = {}
+) => {
+  const startDay = isoToDayNumber(startDate)
+  const sourceDays = [
+    startDay,
+    isoToDayNumber(date1),
+    isoToDayNumber(date2),
+    isoToDayNumber(date3),
+    isoToDayNumber(endDate)
+  ]
+  const randomizedDays = [sourceDays[0]]
+
+  for (let index = 1; index < sourceDays.length; index += 1) {
+    const shouldRandomize = includeEndDate || index < sourceDays.length - 1
+    const shiftedDay = shouldRandomize ? sourceDays[index] + getRandomDayOffset() : sourceDays[index]
+    randomizedDays[index] = Math.max(randomizedDays[index - 1] + 1, shiftedDay)
+  }
+
+  return {
+    startDate: dayNumberToIso(randomizedDays[0]),
+    date1: dayNumberToIso(randomizedDays[1]),
+    date2: dayNumberToIso(randomizedDays[2]),
+    date3: dayNumberToIso(randomizedDays[3]),
+    endDate: dayNumberToIso(randomizedDays[4])
+  }
 }
 
 const toDisplayDate = (isoDate) => (isoDate ? isoDate.replaceAll('-', '/') : '')
@@ -435,11 +471,12 @@ const buildDefaultDates = () => {
   const startDate = formatIsoDate(today)
   const nextMonth25 = new Date(today.getFullYear(), today.getMonth() + 1, 25)
   const endDate = formatIsoDate(nextMonth25)
-  return {
+  const middleDates = calculateMiddleDates(startDate, endDate)
+  return buildRandomizedDates({
     startDate,
     endDate,
-    ...calculateMiddleDates(startDate, endDate)
-  }
+    ...middleDates
+  })
 }
 
 const buildDefaultTemplateForm = () => {
@@ -521,7 +558,25 @@ const buildContentByProjectName = (projectName) => {
     .trim()
 }
 
-const getContentByRow = (row) => (row?.aiContent || buildContentByProjectName(row?.productName || '')).trim()
+const getBaseContentByRow = (row) => (row?.aiContent || buildContentByProjectName(row?.productName || '')).trim()
+
+const hasManualContent = (row) => Object.prototype.hasOwnProperty.call(row || {}, 'manualContent')
+
+const getEditableContentByRow = (row) => {
+  if (hasManualContent(row)) return row.manualContent
+  return getBaseContentByRow(row)
+}
+
+const updateRowContent = (row, value) => {
+  row.manualContent = String(value ?? '')
+}
+
+const getContentByRow = (row) => {
+  if (hasManualContent(row)) {
+    return String(row.manualContent ?? '').trim()
+  }
+  return getBaseContentByRow(row)
+}
 
 const setRowAiGenerating = (rowId, isLoading) => {
   if (!rowId) return
@@ -534,6 +589,19 @@ const setRowAiGenerating = (rowId, isLoading) => {
   }
   aiGeneratingRowMap.value = nextState
 }
+
+const syncAiGeneratingRowMap = () => {
+  const validIds = new Set(projectRows.value.map((row) => row.id).filter(Boolean))
+  const nextLoadingState = {}
+  Object.keys(aiGeneratingRowMap.value).forEach((rowId) => {
+    if (validIds.has(rowId)) {
+      nextLoadingState[rowId] = true
+    }
+  })
+  aiGeneratingRowMap.value = nextLoadingState
+}
+
+const isBusy = () => isGenerating.value || isOcrProcessing.value
 
 const outputDescription = computed(() => {
   if (projectRows.value.length === 0) return '暂无可生成项目'
@@ -582,7 +650,13 @@ watch(
   () => [form.value.startDate, form.value.endDate],
   ([startDate, endDate]) => {
     if (!startDate || !endDate) return
-    Object.assign(form.value, calculateMiddleDates(startDate, endDate))
+    const middleDates = calculateMiddleDates(startDate, endDate)
+    const randomizedDates = buildRandomizedDates({ startDate, endDate, ...middleDates }, { includeEndDate: false })
+    Object.assign(form.value, {
+      date1: randomizedDates.date1,
+      date2: randomizedDates.date2,
+      date3: randomizedDates.date3
+    })
     persistTemplateSettings()
   }
 )
@@ -605,6 +679,7 @@ const normalizeRow = (row) => {
   const normalizedName = normalizeProjectName(row.productName)
   if (row.productName !== normalizedName) {
     row.aiContent = ''
+    delete row.manualContent
   }
   row.productName = normalizedName
 }
@@ -628,6 +703,7 @@ const applyParsedRows = (rows, mode = 'replace') => {
     if (existing) {
       if (existing.productName !== productName) {
         existing.aiContent = ''
+        delete existing.manualContent
       }
       existing.productName = productName
     } else {
@@ -636,15 +712,7 @@ const applyParsedRows = (rows, mode = 'replace') => {
   })
 
   projectRows.value = Array.from(sourceMap.values())
-
-  const validIds = new Set(projectRows.value.map((row) => row.id).filter(Boolean))
-  const nextLoadingState = {}
-  Object.keys(aiGeneratingRowMap.value).forEach((rowId) => {
-    if (validIds.has(rowId)) {
-      nextLoadingState[rowId] = true
-    }
-  })
-  aiGeneratingRowMap.value = nextLoadingState
+  syncAiGeneratingRowMap()
 }
 
 const parseInput = (mode = 'replace') => {
@@ -682,6 +750,7 @@ const generateRowContentWithAi = async (row, { silentSuccess = false } = {}) => 
   setRowAiGenerating(rowId, true)
   try {
     row.aiContent = await requestInitiationContent(row.productName)
+    delete row.manualContent
     if (!silentSuccess) {
       ElMessage.success(`已生成 ${row.productName} 的Content`)
     }
@@ -727,14 +796,7 @@ const generateAllContentWithAi = async () => {
 
 const removeRow = (index) => {
   projectRows.value.splice(index, 1)
-  const validIds = new Set(projectRows.value.map((row) => row.id).filter(Boolean))
-  const nextLoadingState = {}
-  Object.keys(aiGeneratingRowMap.value).forEach((rowId) => {
-    if (validIds.has(rowId)) {
-      nextLoadingState[rowId] = true
-    }
-  })
-  aiGeneratingRowMap.value = nextLoadingState
+  syncAiGeneratingRowMap()
 }
 
 const clearRows = () => {
@@ -747,7 +809,12 @@ const recalculateMiddleDates = () => {
     ElMessage.warning('请先选择开始和结束日期')
     return
   }
-  Object.assign(form.value, calculateMiddleDates(form.value.startDate, form.value.endDate))
+  const middleDates = calculateMiddleDates(form.value.startDate, form.value.endDate)
+  const randomizedDates = buildRandomizedDates(
+    { startDate: form.value.startDate, endDate: form.value.endDate, ...middleDates },
+    { includeEndDate: true }
+  )
+  Object.assign(form.value, randomizedDates)
   persistTemplateSettings()
 }
 
@@ -799,7 +866,7 @@ const buildPayloads = () => {
   }
 
   const contentTemplate = form.value.contentTemplate.trim()
-  const hasFallbackRows = rows.some((row) => !row.aiContent?.trim())
+  const hasFallbackRows = rows.some((row) => !row.aiContent?.trim() && !hasManualContent(row))
   if (hasFallbackRows && !contentTemplate) {
     ElMessage.error('请填写 Content 模板，或先为所有项目生成AI内容')
     return null
@@ -817,8 +884,22 @@ const buildPayloads = () => {
     .filter(Boolean)
     .join('、')
 
-  return rows.map((row) => {
-    const content = getContentByRow(row)
+  const rowsWithContent = rows.map((row) => ({ ...row, content: getContentByRow(row) }))
+  const emptyContentRows = rowsWithContent.filter((row) => !row.content)
+  if (emptyContentRows.length > 0) {
+    ElMessage.error('存在空的 Content，请补全后再生成')
+    return null
+  }
+
+  return rowsWithContent.map((row) => {
+    const randomizedDates = buildRandomizedDates({
+      startDate: form.value.startDate,
+      date1: form.value.date1,
+      date2: form.value.date2,
+      date3: form.value.date3,
+      endDate: form.value.endDate
+    }, { includeEndDate: true })
+
     return {
       fileName: `DOC-MP-${row.number}.xlsx`,
       placeholders: {
@@ -826,12 +907,12 @@ const buildPayloads = () => {
         ProductName: row.productName,
         OwnerName: owner.name,
         Merber: members,
-        Content: content,
-        StartDate: toDisplayDate(form.value.startDate),
-        Date1: toDisplayDate(form.value.date1),
-        Date2: toDisplayDate(form.value.date2),
-        Date3: toDisplayDate(form.value.date3),
-        EndDate: toDisplayDate(form.value.endDate),
+        Content: row.content,
+        StartDate: toDisplayDate(randomizedDates.startDate),
+        Date1: toDisplayDate(randomizedDates.date1),
+        Date2: toDisplayDate(randomizedDates.date2),
+        Date3: toDisplayDate(randomizedDates.date3),
+        EndDate: toDisplayDate(randomizedDates.endDate),
         Amount: form.value.amount ?? 0
       }
     }
@@ -1087,12 +1168,12 @@ const onOcrImageChange = async (uploadFile) => {
 }
 
 const onImportZoneDragEnter = () => {
-  if (isGenerating.value || isOcrProcessing.value) return
+  if (isBusy()) return
   isDropZoneActive.value = true
 }
 
 const onImportZoneDragOver = () => {
-  if (isGenerating.value || isOcrProcessing.value) return
+  if (isBusy()) return
   isDropZoneActive.value = true
 }
 
@@ -1102,7 +1183,7 @@ const onImportZoneDragLeave = () => {
 
 const onImportZoneDrop = async (event) => {
   isDropZoneActive.value = false
-  if (isGenerating.value || isOcrProcessing.value) return
+  if (isBusy()) return
 
   const dataTransfer = event.dataTransfer
   if (!dataTransfer) return
@@ -1136,7 +1217,7 @@ const isEditableTarget = (target) => {
 }
 
 const onImportZonePaste = async (event) => {
-  if (isGenerating.value || isOcrProcessing.value) return
+  if (isBusy()) return
 
   const clipboard = event.clipboardData
   if (!clipboard) return
@@ -1157,7 +1238,7 @@ const onImportZonePaste = async (event) => {
 
 const onGlobalPaste = async (event) => {
   if (event.defaultPrevented) return
-  if (isGenerating.value || isOcrProcessing.value) return
+  if (isBusy()) return
 
   const clipboard = event.clipboardData
   if (!clipboard) return

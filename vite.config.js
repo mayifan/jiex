@@ -16,34 +16,24 @@ const readBody = (req) => new Promise((resolve, reject) => {
   req.on('error', reject)
 })
 
-const deepseekDevApiPlugin = () => {
+const registerApiHandler = (middlewares, path, handleRequest) => {
+  middlewares.use(path, async (req, res, next) => {
+    if (req.method !== 'POST') {
+      next()
+      return
+    }
+
+    await handleRequest(req, res)
+  })
+}
+
+const createDevApiPlugin = ({ name, routePath, handleRequest }) => {
   const registerHandler = (middlewares) => {
-    middlewares.use('/api/deepseek/content', async (req, res, next) => {
-      if (req.method !== 'POST') {
-        next()
-        return
-      }
-
-      try {
-        const rawBody = await readBody(req)
-        const payload = rawBody ? JSON.parse(rawBody) : {}
-        const projectName = payload?.projectName
-        if (!projectName) {
-          writeJson(res, 400, { error: '缺少 projectName 参数' })
-          return
-        }
-
-        const content = await requestDeepSeekContent(projectName)
-        writeJson(res, 200, { content })
-      } catch (error) {
-        console.error('Vite DeepSeek API failed:', error)
-        writeJson(res, 500, { error: error.message || 'DeepSeek调用失败' })
-      }
-    })
+    registerApiHandler(middlewares, routePath, handleRequest)
   }
 
   return {
-    name: 'deepseek-dev-api',
+    name,
     configureServer(server) {
       registerHandler(server.middlewares)
     },
@@ -53,42 +43,49 @@ const deepseekDevApiPlugin = () => {
   }
 }
 
-const glmOcrDevApiPlugin = () => {
-  const registerHandler = (middlewares) => {
-    middlewares.use('/api/glm/ocr', async (req, res, next) => {
-      if (req.method !== 'POST') {
-        next()
+const deepseekDevApiPlugin = () => createDevApiPlugin({
+  name: 'deepseek-dev-api',
+  routePath: '/api/deepseek/content',
+  async handleRequest(req, res) {
+    try {
+      const rawBody = await readBody(req)
+      const payload = rawBody ? JSON.parse(rawBody) : {}
+      const projectName = payload?.projectName
+      if (!projectName) {
+        writeJson(res, 400, { error: '缺少 projectName 参数' })
         return
       }
 
-      try {
-        const rawBody = await readBody(req)
-        const payload = rawBody ? JSON.parse(rawBody) : {}
-        const file = payload?.file || payload?.imageUrl || payload?.imageBase64
-        if (!file) {
-          writeJson(res, 400, { error: '缺少 file 参数' })
-          return
-        }
-
-        const text = await requestGlmOcrText({ file })
-        writeJson(res, 200, { text })
-      } catch (error) {
-        console.error('Vite GLM-OCR API failed:', error)
-        writeJson(res, 500, { error: error.message || 'GLM-OCR调用失败' })
-      }
-    })
-  }
-
-  return {
-    name: 'glm-ocr-dev-api',
-    configureServer(server) {
-      registerHandler(server.middlewares)
-    },
-    configurePreviewServer(server) {
-      registerHandler(server.middlewares)
+      const content = await requestDeepSeekContent(projectName)
+      writeJson(res, 200, { content })
+    } catch (error) {
+      console.error('Vite DeepSeek API failed:', error)
+      writeJson(res, 500, { error: error.message || 'DeepSeek调用失败' })
     }
   }
-}
+})
+
+const glmOcrDevApiPlugin = () => createDevApiPlugin({
+  name: 'glm-ocr-dev-api',
+  routePath: '/api/glm/ocr',
+  async handleRequest(req, res) {
+    try {
+      const rawBody = await readBody(req)
+      const payload = rawBody ? JSON.parse(rawBody) : {}
+      const file = payload?.file || payload?.imageUrl || payload?.imageBase64
+      if (!file) {
+        writeJson(res, 400, { error: '缺少 file 参数' })
+        return
+      }
+
+      const text = await requestGlmOcrText({ file })
+      writeJson(res, 200, { text })
+    } catch (error) {
+      console.error('Vite GLM-OCR API failed:', error)
+      writeJson(res, 500, { error: error.message || 'GLM-OCR调用失败' })
+    }
+  }
+})
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')

@@ -41,7 +41,12 @@ const props = defineProps({
   }
 })
 
-const brandText = computed(() => (props.activePage === 'initiation' ? 'Keeson 立项工具' : 'Keeson 结项工具'))
+const BRAND_TEXT_MAP = {
+  completion: 'Keeson 结项工具',
+  initiation: 'Keeson 立项工具'
+}
+
+const brandText = computed(() => BRAND_TEXT_MAP[props.activePage] || BRAND_TEXT_MAP.completion)
 </script>
 
 <style scoped>

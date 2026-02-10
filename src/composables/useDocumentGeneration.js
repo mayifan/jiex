@@ -54,14 +54,18 @@ export function useDocumentGeneration() {
   const buildTemplateData = ({ text1, text2, text3, text4Content, jobContents, projectParticipants }) => {
     const data = { text1, text2, text3, text4: text4Content }
 
+    const resolveJob = (index) => {
+      const input = (jobContents?.[`job${index}`] || '').trim()
+      const fallback = index === 1 ? '开发' : '协助开发'
+      return input || fallback
+    }
+
     projectParticipants.forEach((participant, index) => {
       const n = index + 1
       data[`name${n}`] = participant?.name || ''
       data[`code${n}`] = participant?.code || ''
       data[`amount${n}`] = participant?.amount ?? ''
-      const inputJob = (jobContents?.[`job${n}`] || '').trim()
-      const defaultJob = n === 1 ? '开发' : '协助开发'
-      data[`job${n}`] = inputJob || defaultJob
+      data[`job${n}`] = resolveJob(n)
     })
 
     return data
@@ -72,6 +76,7 @@ export function useDocumentGeneration() {
     try {
       const firstParticipant = participants.find(p => p.code === selectedFirstParticipant)
       if (!firstParticipant) throw new Error('未找到主要参与者，请重新选择')
+      const participantMap = new Map(participants.map((participant) => [participant.code, participant]))
 
       const zip = new JSZip()
       const generatedFiles = []
@@ -84,14 +89,13 @@ export function useDocumentGeneration() {
         const selectedSecondary = Object.entries(alloc.secondary)
           .filter(([, data]) => data.selected)
           .map(([code, data]) => {
-            const participant = participants.find(p => p.code === code)
+            const participant = participantMap.get(code)
             return participant ? { ...participant, amount: data.amount } : null
           })
           .filter(Boolean)
 
         if (selectedSecondary.length < 2) {
           ElMessage.error(`项目 ${alloc.projectName} 需要至少2个次要参与者`)
-          isGenerating.value = false
           return false
         }
 

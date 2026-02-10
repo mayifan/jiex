@@ -222,12 +222,20 @@ const persistCompletionTemplate = (text4Value, jobs) => {
 
 const activePage = ref('completion')
 
-const pageTitle = computed(() => (activePage.value === 'completion' ? 'Keeson 结项工具' : 'Keeson 立项工具'))
-const pageDescription = computed(() => (
-  activePage.value === 'completion'
-    ? '上传Excel文件，自动生成格式化的Word结项文档'
-    : '基于立项模板填写参数并生成 DOC-MP-{Number} 的立项单'
-))
+const pageMeta = {
+  completion: {
+    title: 'Keeson 结项工具',
+    description: '上传Excel文件，自动生成格式化的Word结项文档'
+  },
+  initiation: {
+    title: 'Keeson 立项工具',
+    description: '基于立项模板填写参数并生成 DOC-MP-{Number} 的立项单'
+  }
+}
+
+const currentPageMeta = computed(() => pageMeta[activePage.value] || pageMeta.completion)
+const pageTitle = computed(() => currentPageMeta.value.title)
+const pageDescription = computed(() => currentPageMeta.value.description)
 
 const cachedTemplate = loadCompletionTemplate()
 const text4Content = ref(cachedTemplate.text4Content)

@@ -27,13 +27,13 @@ const normalizeSummary = (summary, projectName) => {
 }
 
 const normalizeItems = (items = []) => {
-  const normalized = items
-    .map((item) => ensureSentence(item))
-    .filter(Boolean)
-
+  const seen = new Set()
   const merged = []
-  normalized.forEach((item) => {
-    if (!merged.includes(item)) merged.push(item)
+  items.forEach((item) => {
+    const normalized = ensureSentence(item)
+    if (!normalized || seen.has(normalized)) return
+    seen.add(normalized)
+    merged.push(normalized)
   })
 
   while (merged.length < 4) {
@@ -114,6 +114,15 @@ const parseDeepSeekContent = (rawContent = '') => {
   return parseTextFallback(rawContent)
 }
 
+const parseErrorDetails = async (response) => {
+  try {
+    const errorPayload = await response.json()
+    return errorPayload?.error?.message || errorPayload?.error || response.statusText
+  } catch {
+    return response.statusText
+  }
+}
+
 export const requestDeepSeekContent = async (projectName) => {
   const safeProjectName = String(projectName || '').trim()
   if (!safeProjectName) {
@@ -144,13 +153,7 @@ export const requestDeepSeekContent = async (projectName) => {
   })
 
   if (!response.ok) {
-    let details = response.statusText
-    try {
-      const errorPayload = await response.json()
-      details = errorPayload?.error?.message || errorPayload?.error || details
-    } catch {
-      // Ignore JSON parse failures for non-JSON error responses.
-    }
+    const details = await parseErrorDetails(response)
     throw new Error(`DeepSeek请求失败(${response.status})：${details || '未知错误'}`)
   }
 

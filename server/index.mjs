@@ -18,24 +18,28 @@ const port = Number(process.env.PORT || 8080)
 
 app.use(express.json({ limit: '20mb' }))
 
+const getTrimmedString = (value) => String(value ?? '').trim()
+const handleApiError = (res, error, fallback) => {
+  res.status(500).json({ error: error?.message || fallback })
+}
+
 app.post('/api/deepseek/content', async (req, res) => {
-  const projectName = req.body?.projectName
+  const projectName = getTrimmedString(req.body?.projectName)
   if (!projectName) {
     res.status(400).json({ error: '缺少 projectName 参数' })
     return
   }
-
   try {
     const content = await requestDeepSeekContent(projectName)
     res.json({ content })
   } catch (error) {
     console.error('DeepSeek content generation failed:', error)
-    res.status(500).json({ error: error.message || 'DeepSeek调用失败' })
+    handleApiError(res, error, 'DeepSeek调用失败')
   }
 })
 
 app.post('/api/glm/ocr', async (req, res) => {
-  const file = req.body?.file || req.body?.imageUrl || req.body?.imageBase64
+  const file = getTrimmedString(req.body?.file || req.body?.imageUrl || req.body?.imageBase64)
   if (!file) {
     res.status(400).json({ error: '缺少 file 参数' })
     return
@@ -46,7 +50,7 @@ app.post('/api/glm/ocr', async (req, res) => {
     res.json({ text })
   } catch (error) {
     console.error('GLM-OCR failed:', error)
-    res.status(500).json({ error: error.message || 'GLM-OCR 调用失败' })
+    handleApiError(res, error, 'GLM-OCR 调用失败')
   }
 })
 

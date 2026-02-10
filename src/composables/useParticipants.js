@@ -95,12 +95,17 @@ export function useParticipants() {
     { deep: true }
   )
 
+  const fail = (message) => {
+    ElMessage.error(message)
+    return false
+  }
+
   const addParticipant = (onSuccess) => {
     const name = String(newParticipant.value.name || '').trim()
     const code = String(newParticipant.value.code || '').trim()
 
-    if (!name || !code) return ElMessage.error('请输入参与者姓名和工号'), false
-    if (participants.value.some((participant) => participant.code === code)) return ElMessage.error('该工号已存在'), false
+    if (!name || !code) return fail('请输入参与者姓名和工号')
+    if (participants.value.some((participant) => participant.code === code)) return fail('该工号已存在')
 
     participants.value.push({ name, code })
     newParticipant.value = { name: '', code: '' }
@@ -110,8 +115,8 @@ export function useParticipants() {
   }
 
   const removeParticipant = (code, onSuccess) => {
-    if (participants.value.length <= 2) return ElMessage.error('至少需要保留2个参与者'), false
-    if (code === selectedFirstParticipant.value) return ElMessage.error('不能删除当前的第一参与者'), false
+    if (participants.value.length <= 2) return fail('至少需要保留2个参与者')
+    if (code === selectedFirstParticipant.value) return fail('不能删除当前的第一参与者')
 
     participants.value = participants.value.filter((participant) => participant.code !== code)
     ElMessage.success('已删除')
