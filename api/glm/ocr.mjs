@@ -55,7 +55,11 @@ export default async function handler(req, res) {
     const text = await requestGlmOcrText({ file })
     writeJson(res, 200, { text })
   } catch (error) {
-    console.error('Vercel GLM-OCR failed:', error)
+    console.error('Vercel GLM-OCR failed:', error, {
+      vercelEnv: process.env.VERCEL_ENV || 'unknown',
+      hasGlmOcrKey: Boolean(String(process.env.GLM_OCR_API_KEY || '').trim()),
+      hasZhipuKey: Boolean(String(process.env.ZHIPU_API_KEY || '').trim())
+    })
     writeJson(res, 500, {
       error: error?.message || 'GLM-OCR 调用失败'
     })

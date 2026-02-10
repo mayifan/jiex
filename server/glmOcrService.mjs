@@ -7,16 +7,20 @@ const __dirname = path.dirname(__filename)
 const rootDir = path.resolve(__dirname, '..')
 
 const ensureEnvLoaded = () => {
+  // Vercel runtime should rely on platform env vars; do not override them.
+  if (process.env.VERCEL) return
+  if (String(process.env.GLM_OCR_API_KEY || '').trim()) return
+
   const candidateDirs = [process.cwd(), rootDir]
   candidateDirs.forEach((dir) => {
-    dotenv.config({ path: path.join(dir, '.env.local'), override: true })
-    dotenv.config({ path: path.join(dir, '.env'), override: true })
+    dotenv.config({ path: path.join(dir, '.env.local') })
+    dotenv.config({ path: path.join(dir, '.env') })
   })
 }
 
 const getBaseUrl = () => process.env.GLM_OCR_BASE_URL || 'https://open.bigmodel.cn'
 const getApiUrl = () => process.env.GLM_OCR_API_URL || ''
-const getApiKey = () => process.env.GLM_OCR_API_KEY || ''
+const getApiKey = () => process.env.GLM_OCR_API_KEY || process.env.ZHIPU_API_KEY || ''
 const getModel = () => process.env.GLM_OCR_MODEL || 'glm-ocr'
 
 const resolveApiUrl = () => {
